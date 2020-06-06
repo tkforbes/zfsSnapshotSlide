@@ -1,0 +1,45 @@
+#!/bin/bash
+
+#
+# This script is designed to be run by cron. Its job is to create periodic
+# snapshots for particular ZFS filesystems and to maintain a sliding
+# window of of snapshots, deleting the old snapshots as new ones are created.
+#
+# The filesystem names and retained-revision numbers are read from an
+# input file.
+#
+IN_FILE=$1
+while read ZFSFS RETAIN_REVS; do
+#    echo "$ZFSFS $RETAIN_REVS"
+
+     FSPATH="/$ZFSFS"
+     if [ !  -d $FSPATH ]; then
+        echo "$0: aborting snapshot. The filesystem $fspath does not exist"
+        exit 1;
+     fi
+
+     # provides timestamp in YYYY-MM-DDThh.mm format
+     timestamp() {
+        date +"%Y-%m-%dT%H.%M"
+     }
+     TS=$(timestamp)
+
+     # get name of the most current snapshot   
+     CURR_SNAPSHOT=$(zfs list -H -o name -t snapshot | grep "^$ZFSFS" | tail -1)
+
+     # is there a current snapshot ?
+     if [[ $CURR_SNAPSHOT ]]; then
+        # determine if there are changes since that snapshot
+        DIFFS=$(zfs diff $CURR_SNAPSHOT)
+
+        if [[ $DIFFS ]]; then
+           # create a snapshot
+           zfs snapshot $ZFSFS@$TS
+           # remove older snapshots
+           zfs list -H -o name -t snapshot | grep "^$ZFSFS" | head -n -$RETAIN_REVS | xargs --no-run-if-empty -n1 zfs destroy
+        fi
+     else
+        # create a snapshot
+        zfs snapshot $ZFSFS@$TS
+     fi
+done < $IN_FILE
