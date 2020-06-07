@@ -30,7 +30,7 @@ while read ZFSFS RETAIN_REVS; do
      # is there a current snapshot ?
      if [[ $CURR_SNAPSHOT ]]; then
         # determine if there are changes since that snapshot
-        DIFFS=$(zfs diff $CURR_SNAPSHOT)
+        DIFFS=$(zfs diff $CURR_SNAPSHOT | head -n 1) 
 
         if [[ $DIFFS ]]; then
            # create a snapshot
